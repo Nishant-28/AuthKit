@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: authkit_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: authkit
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d  # Optional: for init scripts
+    networks:
+      - authkit-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: authkit_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf  # Optional: custom config
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - authkit-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  authkit-network:
+    driver: bridge
