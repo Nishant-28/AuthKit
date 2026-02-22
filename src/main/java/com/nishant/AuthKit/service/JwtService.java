@@ -30,6 +30,10 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
+    public long getJwtExpiration() {
+        return jwtExpiration;
+    }
+
     private SecretKey key;
 
     @PostConstruct
@@ -44,7 +48,7 @@ public class JwtService {
         return generateToken(new HashMap<>(), userDetails);
     }
 
-    private String generateToken(HashMap<String,Object> extractClaims, UserDetails userDetails) {
+    private String generateToken(HashMap<String, Object> extractClaims, UserDetails userDetails) {
         var authorities = userDetails.getAuthorities()
                 .stream()
                 .map(GrantedAuthority::getAuthority)

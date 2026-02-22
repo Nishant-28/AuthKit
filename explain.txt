@@ -1,0 +1,1412 @@
+Can you help me do a small project where I will make a Frontend (from AI) and backend (by myself) and make a Authentication and Authorization implementation Project in Spring Boot, and along the way, you have to guide me (not give me code, but help me) from starting the project to making it advanced. for Context I have enough knowledge of Spring Boot. I also want it to have Redis (how can we use that? to store the information of login? i am noob in redis impl but understand its principle)
+What else can we do?
+A microservices project?
+Ask me questions if you want to know more.Jan 26I love this project idea! Let me ask you some clarifying questions to help us design the best learning path:
+About Your Goals
+
+Primary Focus: Do you want to go deep on auth/authz in a single application first, or would you prefer to immediately start with a microservices architecture where auth is distributed across services?
+Authentication Methods: Which auth mechanisms interest you most?
+
+JWT tokens (stateless)?
+Session-based (stateful)?
+OAuth2/OpenID Connect (social login, SSO)?
+All of the above in a progressive manner?
+
+
+Authorization Complexity: How deep do you want to go?
+
+Basic role-based (ROLE_USER, ROLE_ADMIN)?
+Permission-based (can_read, can_write, can_delete)?
+Resource-level (user can only edit their own posts)?
+Advanced patterns like ABAC (Attribute-Based Access Control)?
+
+
+
+About Redis Usage
+You're on the right track! Redis can serve multiple purposes here:
+
+Session storage (for session-based auth)
+Token blacklist (for logout with JWT)
+Rate limiting (prevent brute force attacks)
+Caching user permissions/roles
+Refresh token storage
+
+Which of these interests you most?
+Architecture Questions
+
+Microservices Scope: If we go microservices, are you thinking:
+
+Auth service + 2-3 business services (like user-service, product-service)?
+Gateway pattern with centralized auth?
+Service-to-service authentication?
+
+
+Frontend Complexity: Should the frontend be:
+
+Simple (login/register forms, protected routes)?
+Moderate (user dashboard, role-based UI)?
+Complex (admin panel, permission management UI)?
+
+
+
+Your Current Knowledge
+
+What's your comfort level with:
+
+Spring Security filters and authentication providers?
+Database design for auth (users, roles, permissions)?
+API design (RESTful practices)?
+
+
+
+Tell me your preferences and we'll create a roadmap that progressively builds from basic to advanced!My Primary Focus is to go deep on auth/authz in a single application first. i have initialized project from Spring Boot with name "AuthKit"JWT Tokens (stateless) as of now, after some time we will move to OAuth2 with WorkOSAll level of deepness except Advanced patterns like ABAC as of now.Let's keep it monolith as of now, we will make this happen first then microservice it.Complexbeginner in Spring Security filters and authentication providers. Intermidiate in Database Design for auth and Advanced in API Design (restfull practices)I am done with the Homework. I have setup the Spring Boot Project (using PostgreSQL, Redis, Lombok, Validation, Security, Web) and Started PostgreSQL, Redis Instance in Docker.Along with this I will also use and Try to learn higher level of Git and Github. I have git init project with my Github link as https://github.com/Nishant-28/AuthKitShow moreJan 26Excellent setup! I can see you're serious about this. Let's build AuthKit properly from the ground up.
+🎯 Project Roadmap Overview
+We'll build this in phases, each adding complexity:
+Phase 1: Foundation (User Registration + JWT basics)
+Phase 2: Advanced JWT (Refresh tokens, blacklisting with Redis)
+Phase 3: Authorization Levels (Roles → Permissions → Resource-level)
+Phase 4: Security Hardening (Rate limiting, audit logs)
+Phase 5: Frontend Integration
+Phase 6: OAuth2/WorkOS Integration
+Phase 7: Microservices Migration
+
+📚 Phase 1: Foundation - Let's Start Here
+Your First Tasks (Database Design)
+Since you're intermediate in DB design, let's start with the schema. Before writing any code, I want you to design:
+1. User Table Schema
+Think about what fields you need:
+
+What identifies a user uniquely?
+How will you store passwords? (hashing algorithm?)
+What metadata is useful? (created_at, updated_at, last_login?)
+Account states? (is_active, is_verified, is_locked?)
+
+2. Think About This Question:
+Should you have a separate user_credentials table or keep everything in users? What are the pros/cons?
+Question for you: Draw out your initial users table schema (just the columns and types). What would you include?
+
+Git Workflow Suggestion
+Since you want to learn advanced Git, let's establish a pattern:
+main (protected, production-ready)
+  └── develop (integration branch)
+       └── feature/user-registration
+       └── feature/jwt-authentication
+       └── feature/role-based-auth
+First Git Task:
+
+Create a develop branch from main
+Create a feature/database-schema branch from develop
+We'll work there first
+
+Do you want me to guide you through setting up branch protection rules on GitHub as well?
+
+Spring Security Crash Course (What You Need to Know)
+Before we code, understand these 4 key concepts:
+
+SecurityFilterChain: The pipeline of filters requests go through
+AuthenticationManager: Validates credentials
+UserDetailsService: Loads user data
+PasswordEncoder: Hashes/verifies passwords
+
+Question: Have you looked at Spring Security's default behavior when you add the dependency? What happens when you try to hit any endpoint right now?
+
+🚀 Your Immediate Action Items
+
+Database Schema: Design your users table (share it with me)
+Git Setup: Create the branch structure I mentioned
+Exploration: Try running your app and hitting http://localhost:8080/ - what happens?
+Read: Spring Security's SecurityFilterChain concept (5-10 min read from Spring docs)
+
+Once you share your schema design, I'll guide you on the entity creation and we'll discuss what Spring Security is doing behind the scenes.
+How does this sound? Ready to start with the database schema?Done with Phase 1: Foundation : both User class and UserRepository. here is a crux of that class 
+
+@Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+    @Column(unique = true, nullable = false)
+    private String username;
+    @Column(unique = true, nullable = false)
+    private String email;
+    @Column(nullable = false)
+    private String password;
+    @Enumerated(EnumType.STRING)
+    private Role role;
+    private String name;
+    private String phoneNumber;
+    private String profilePicUrl;
+    private String bio;
+    @Builder.Default
+    private boolean enabled = true;
+    @Builder.Default
+    private boolean locked = false;
+    private boolean emailVerified;
+    private String otp;
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+    @UpdateTimestamp
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+Show moreJan 27Great start! Your User entity shows good thinking. Let me give you some guidance on improvements and what's next.
+🔍 Review of Your User Entity
+✅ What You Did Well
+
+Unique constraints on username and email
+Audit fields (createdAt, updatedAt)
+Account state management (enabled, locked)
+Builder pattern with defaults
+
+🤔 Areas for Discussion
+1. ID Type Choice
+You used Integer - this limits you to ~2 billion users. Consider:
+
+Should this be Long for scalability?
+Or UUID for distributed systems later?
+
+2. Password Field
+Currently it's just String password. Questions:
+
+Where will you hash it? (Service layer? Yes!)
+Should this field be excluded from JSON serialization? (Security concern!)
+
+3. OTP Field
+You have String otp directly in User entity. Think about:
+
+OTPs are temporary - should they live in the main user table?
+What about OTP expiry time?
+Could this be a separate table? (user_otp with expiry, type, used status)
+
+4. Role as Enum
+You're using a single Role enum. This works for simple cases, but:
+
+What if a user has multiple roles? (Admin + Moderator?)
+For Phase 3, we'll need a separate roles/permissions structure
+
+5. Missing Fields to Consider
+
+lastLoginAt - useful for security monitoring
+passwordChangedAt - for invalidating old tokens
+failedLoginAttempts - for brute force protection
+accountLockedUntil - temporary locks
+
+
+🎯 Your Next Steps
+Step 1: Secure the Password Field
+Add this to your User class:
+java@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+private String password;
+Question: Why WRITE_ONLY? What does this prevent?
+
+Step 2: Create DTOs (Data Transfer Objects)
+You should never expose your entity directly. Create:
+A. UserRegistrationRequest DTO
+What fields should a user provide during registration?
+
+Username, email, password, name... what else?
+Should phoneNumber be required?
+
+B. UserResponse DTO
+What fields should the API return after registration/login?
+
+Definitely NOT password
+Maybe NOT otp, locked, enabled (security through obscurity)
+
+Your Task: Create a dto package and design these two DTOs. What fields go in each?
+
+Step 3: Password Encoding Configuration
+Before you write any service logic, you need to configure password hashing.
+Question for You:
+
+Do you know what BCrypt is and why we use it?
+Where should you configure the PasswordEncoder bean?
+
+Hint: You'll need a @Configuration class. Think about what to name it - maybe SecurityConfig or PasswordConfig?
+
+Step 4: Service Layer Design
+Think about the responsibilities:
+UserService should handle:
+
+User registration logic
+User retrieval by username/email
+Profile updates
+
+AuthService should handle:
+
+Login logic
+Token generation
+Token validation
+
+Question: Should these be the same service or separate? What's your reasoning?
+
+📊 Database Migration Question
+How are you managing your database schema?
+
+Are you using spring.jpa.hibernate.ddl-auto=update? (Not recommended for production!)
+Have you considered Flyway or Liquibase for version-controlled migrations?
+
+For a production-grade project, I recommend setting up Flyway now. Interested?
+
+🌿 Git Check-in
+
+Are you working on a feature branch?
+Have you committed your User entity yet?
+Commit message should be descriptive: feat: create User entity with authentication fields
+
+
+✋ Before Moving Forward
+Complete these and report back:
+
+Add @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) to password
+Create UserRegistrationRequest DTO (share fields you chose)
+Create UserResponse DTO (share fields you chose)
+Answer: Should OTP be in a separate table? Your thoughts?
+Create a SecurityConfig class with PasswordEncoder bean
+
+Once you share these, we'll move to implementing the registration endpoint!
+How's your pace? Feeling good about the direction?I have changed it to Long.As of now I have kept it simple.I have removed otp from user table.What should i do here?Just added lastLoginAt, keeping it simple as of now.Done with Step 1: Secure the Password Field
+Done with Step 2: Create DTOs public class UserResponseDTO {
+    private String accessToken;
+}public class UserRegistrationRequestDTO {
+    private String username;
+    private String email;
+    private String password;
+}Is it good enough or do i need different DTOs? Done with Step 3: Password Encoding Configuration
+Don't worry I will add Step 4: Service Layer Design now only.Show moreJan 27Good progress! But let me stop you here - your DTOs need rethinking.
+🚨 Critical DTO Issues
+Problem 1: UserResponseDTO
+javapublic class UserResponseDTO {
+    private String accessToken;  // ❌ This is wrong!
+}
+Why is this wrong?
+
+UserResponseDTO should represent USER data (id, username, email, name, etc.)
+Access tokens belong in an AuthResponseDTO (for login/register responses)
+
+Think about it: When someone calls GET /api/users/me to get their profile, should they get a token? No! They should get user info.
+Problem 2: Missing User Data in Response
+After registration, the user should know:
+
+Was it successful?
+What's their user ID?
+What's their username, email?
+When was their account created?
+
+
+📝 Let Me Guide Your DTO Design
+Correct DTO Structure
+You need THREE DTOs, not two:
+1. UserRegistrationRequestDTO ✅ (Your input DTO - looks good!)
+java// What user sends during registration
+- username
+- email  
+- password
+- name (optional?)
+2. UserResponseDTO ❌ (Needs fixing!)
+java// What API returns for user-related endpoints
+// Used for: GET /users/me, GET /users/{id}, etc.
+- id
+- username
+- email
+- name
+- role
+- profilePicUrl
+- createdAt
+- lastLoginAt
+// NO password, NO token, NO sensitive fields
+3. AuthResponseDTO (You're missing this!)
+java// What API returns after login/register
+- accessToken
+- tokenType (e.g., "Bearer")
+- expiresIn (e.g., 3600 seconds)
+- user (UserResponseDTO nested here!)
+
+🤔 Question for You
+For registration endpoint /auth/register, what should the response contain?
+Option A:
+json{
+  "accessToken": "eyJhbGc..."
+}
+Option B:
+json{
+  "accessToken": "eyJhbGc...",
+  "tokenType": "Bearer",
+  "expiresIn": 3600,
+  "user": {
+    "id": 1,
+    "username": "nishant",
+    "email": "nishant@example.com",
+    "role": "USER"
+  }
+}
+Which is better UX for the frontend? Why?
+
+🎯 Your Corrective Actions
+1. Rename and Fix UserResponseDTO
+java@Data
+@Builder
+public class UserResponseDTO {
+    private Long id;
+    private String username;
+    private String email;
+    private String name;
+    private String role;
+    // What else from User entity should be public?
+}
+Your task: Decide which fields from your User entity should be in this DTO.
+2. Create AuthResponseDTO
+java@Data
+@Builder
+public class AuthResponseDTO {
+    private String accessToken;
+    private String tokenType;
+    private Long expiresIn;
+    private UserResponseDTO user;
+}
+3. Add Validation Annotations
+Your UserRegistrationRequestDTO needs validation:
+javapublic class UserRegistrationRequestDTO {
+    @NotBlank(message = "Username is required")
+    @Size(min = 3, max = 20)
+    private String username;
+    
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    private String email;
+    
+    @NotBlank(message = "Password is required")
+    @Size(min = 8, message = "Password must be at least 8 characters")
+    // Should you add password complexity validation?
+    private String password;
+}
+Question: Should you enforce password complexity rules? (uppercase, lowercase, digit, special char) Or keep it simple for now?
+
+🔄 About Multiple Roles (Question 4)
+You asked "What should I do here?" about multiple roles.
+For Phase 1-2: Keep it simple with single Role enum
+javapublic enum Role {
+    USER,
+    ADMIN
+}
+For Phase 3: We'll refactor to a proper roles-permissions table structure:
+
+users ↔ user_roles ↔ roles ↔ role_permissions ↔ permissions
+
+Don't worry about this now. Your current enum approach is fine to start.
+
+✅ Before Moving to Service Layer
+Complete these:
+
+Fix UserResponseDTO - add proper user fields (share what you include)
+Create AuthResponseDTO - with token + user data
+Add validation to UserRegistrationRequestDTO
+Answer my question: Which response format (A or B above) and why?
+Decide: Password complexity validation now or later?
+
+Once you share your updated DTOs, we'll dive into the Service layer and understand how UserDetailsService works!
+Ready to fix the DTOs?Learned and Fixed UserResponseDTO,Created AuthResponseDTO,Added validation to UserRegistrationRequestDTO,Response should contain Option B, this response adds more information in single API call of Login or so, about user.Keep it simple as of now.Additionally I have created a config/ApplicationConfig.java file ```
+@Configuration
+@RequiredArgsConstructor
+public class ApplicationConfig {    private final UserRepository userRepository;    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    }    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(null);
+        authProvider.setUserDetailsPasswordService((UserDetailsPasswordService) userDetailsService());
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
+    }    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+```Judge this hard, and now let's move to next step.Show moreJan 27🔴 STOP - Critical Issues in Your Config!
+Your ApplicationConfig has serious problems. Let me break them down:
+
+❌ Critical Error 1: UserDetailsService Implementation
+java@Bean
+public UserDetailsService userDetailsService() {
+    return username -> userRepository.findByUsername(username)
+            .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+}
+Problem: Your User entity doesn't implement UserDetails interface!
+Spring Security expects UserDetailsService to return a UserDetails object, but you're returning your User entity directly.
+What you need to do:
+Your User entity must implement UserDetails:
+java@Entity
+@Table(name = "users")
+public class User implements UserDetails {
+    
+    // ... your existing fields ...
+    
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        // Return user's roles/permissions
+        // How will you convert your Role enum to GrantedAuthority?
+    }
+    
+    @Override
+    public String getPassword() {
+        return this.password;
+    }
+    
+    @Override
+    public String getUsername() {
+        return this.username;
+    }
+    
+    @Override
+    public boolean isAccountNonExpired() {
+        return true; // Or implement your logic
+    }
+    
+    @Override
+    public boolean isAccountNonLocked() {
+        return !this.locked; // Use your locked field!
+    }
+    
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true; // Or check passwordChangedAt
+    }
+    
+    @Override
+    public boolean isEnabled() {
+        return this.enabled; // Use your enabled field!
+    }
+}
+Question for you: How will you implement getAuthorities() to convert your Role enum into GrantedAuthority?
+Hint: Look at SimpleGrantedAuthority class.
+
+❌ Critical Error 2: Wrong Authentication Provider Setup
+java@Bean
+public AuthenticationProvider authenticationProvider() {
+    DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(null);  // ❌ Why null?
+    authProvider.setUserDetailsPasswordService((UserDetailsPasswordService) userDetailsService());  // ❌ WRONG!
+    authProvider.setPasswordEncoder(passwordEncoder());
+    return authProvider;
+}
+Problems:
+
+new DaoAuthenticationProvider(null) - Why are you passing null? Just use no-arg constructor
+Wrong cast: UserDetailsService is NOT UserDetailsPasswordService - these are different interfaces!
+You should use setUserDetailsService(), not setUserDetailsPasswordService()
+
+Correct version:
+java@Bean
+public AuthenticationProvider authenticationProvider() {
+    DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+    authProvider.setUserDetailsService(userDetailsService());
+    authProvider.setPasswordEncoder(passwordEncoder());
+    return authProvider;
+}
+
+✅ What You Got Right
+
+PasswordEncoder bean - BCrypt is the right choice ✓
+AuthenticationManager bean - Correct setup ✓
+Overall structure - You're on the right track with the config class ✓
+
+
+🎯 Your Immediate Fix Tasks
+Task 1: Make User implement UserDetails
+Update your User entity to implement all UserDetails methods.
+Challenge: Implement getAuthorities() method:
+java@Override
+public Collection<? extends GrantedAuthority> getAuthorities() {
+    // How will you convert this.role (enum) to List<GrantedAuthority>?
+    // Hint: return List.of(new SimpleGrantedAuthority("ROLE_" + this.role.name()));
+}
+Question: Why do we prefix with "ROLE_"? (Important for later!)
+Task 2: Fix authenticationProvider() method
+Remove the null, remove the wrong cast, use correct setter.
+Task 3: Add missing method to UserRepository
+javapublic interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByUsername(String username);
+    // Do you need findByEmail() too? Think about login options
+}
+
+🤔 Design Question for You
+Should users be able to login with email OR username?
+If yes, your UserDetailsService needs to be smarter:
+java@Bean
+public UserDetailsService userDetailsService() {
+    return usernameOrEmail -> userRepository.findByUsername(usernameOrEmail)
+            .or(() -> userRepository.findByEmail(usernameOrEmail))  // Try email if username fails
+            .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+}
+What do you prefer?
+
+📚 Understanding Check
+Before moving forward, answer these:
+
+What is UserDetails? Why does Spring Security need it?
+What is DaoAuthenticationProvider? What's the "Dao" part?
+What does AuthenticationManager do? When is it called?
+Why BCrypt over plain text or MD5? (You should know this!)
+
+
+⏭️ After You Fix These...
+Once your config is corrected, we'll create:
+
+JwtService - for token generation/validation
+AuthService - for registration/login logic
+AuthController - REST endpoints
+
+But first, fix the config issues!
+Share your corrected ApplicationConfig and updated User entity (just the UserDetails methods).
+Don't proceed until these are right - security config is the foundation of everything!
+Ready to fix? Show me your corrections!Critical Error 1:
+I have used, return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));Critical Error 2:
+That has been depreciated, I have changed it to @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService());
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
+    }Task 1 Done
+answer me, Why do we prefix with "ROLE_"?
+Task 2 Done
+Task 3 DoneI have upgraded it to have login with email OR username, thanks here!What i have to do next?
+do i have to Create a service class config/JwtService.java.
+This class needs 3 Critical Methods. I want you to try and implement them (look up documentation or examples if needed, but try to understand the flow):
+1. generateToken(UserDetails userDetails):
+   * It should build a JWT.
+   * Set the Subject as the username (or email).
+   * Crucial: Set the IssuedAt and Expiration (set it to 1 day for now).
+   * Sign it with a Secret Key.
+2. extractUsername(String token):
+   * This parses the token string.
+   * It needs the same Secret Key to decode it.
+   * It returns the Subject (username/email).
+3. isTokenValid(String token, UserDetails userDetails):
+   * Extract the username from the token.
+   * Check if it matches userDetails.getUsername().
+   * Check if the token is expired.Show moreJan 27Excellent fixes! Let me answer your question first, then guide you on JWT implementation.
+
+🎯 Why "ROLE_" Prefix?
+Short Answer: Spring Security convention for role-based authorization.
+Long Answer:
+When you use annotations like:
+java@PreAuthorize("hasRole('ADMIN')")
+// or
+@Secured("ROLE_ADMIN")
+Spring Security automatically looks for authorities with the "ROLE_" prefix.
+
+hasRole('ADMIN') → looks for authority ROLE_ADMIN
+hasAuthority('ADMIN') → looks for exact match ADMIN
+
+So if your getAuthorities() returns ROLE_USER, you can use:
+java@PreAuthorize("hasRole('USER')")  // Will match ROLE_USER
+But if you returned just USER, you'd need:
+java@PreAuthorize("hasAuthority('USER')")  // Exact match
+Best Practice: Always use "ROLE_" prefix for roles. Later in Phase 3, when we add permissions, those won't have the prefix (like READ_POSTS, DELETE_USER).
+
+🔐 JWT Implementation - Let's Design First!
+Before you code, let's think through the architecture:
+Step 1: Add JWT Dependency
+Add this to pom.xml:
+xml<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-api</artifactId>
+    <version>0.12.6</version>
+</dependency>
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-impl</artifactId>
+    <version>0.12.6</version>
+    <scope>runtime</scope>
+</dependency>
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-jackson</artifactId>
+    <version>0.12.6</version>
+    <scope>runtime</scope>
+</dependency>
+
+Step 2: Application Properties Setup
+Before writing JwtService, add these to application.properties:
+properties# JWT Configuration
+jwt.secret=your-very-long-secret-key-at-least-256-bits-long-for-HS256
+jwt.expiration=86400000
+# 86400000ms = 24 hours
+🚨 Security Question:
+
+Should you commit jwt.secret to GitHub?
+How would you handle secrets in production?
+Have you heard of environment variables or .env files?
+
+Think about: Using ${JWT_SECRET:default-dev-secret} pattern.
+
+Step 3: JwtService Design Challenge
+Create service/JwtService.java. Here's the skeleton - you fill in the implementation:
+java@Service
+public class JwtService {
+
+    @Value("${jwt.secret}")
+    private String secretKey;
+    
+    @Value("${jwt.expiration}")
+    private long jwtExpiration;
+
+    /**
+     * TODO: Implement this method
+     * 
+     * Steps:
+     * 1. Create a SecretKey from your secretKey string
+     *    Hint: Keys.hmacShaKeyFor(secretKey.getBytes())
+     * 
+     * 2. Build the JWT using Jwts.builder()
+     *    - setSubject(userDetails.getUsername())
+     *    - setIssuedAt(new Date())
+     *    - setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
+     *    - signWith(key)
+     * 
+     * 3. Return compact() string
+     */
+    public String generateToken(UserDetails userDetails) {
+        // Your code here
+        return null;
+    }
+
+    /**
+     * TODO: Implement this method
+     * 
+     * Steps:
+     * 1. Parse the token using Jwts.parser()
+     * 2. Set the signing key (same one used to sign)
+     * 3. Build and parse the token
+     * 4. Get claims and extract subject
+     */
+    public String extractUsername(String token) {
+        // Your code here
+        return null;
+    }
+
+    /**
+     * TODO: Implement this method
+     * 
+     * Steps:
+     * 1. Extract username from token
+     * 2. Check if it matches userDetails.getUsername()
+     * 3. Check if token is not expired (extract expiration date, compare with now)
+     */
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        // Your code here
+        return false;
+    }
+
+    // Helper method - you might need this
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+    
+    // Helper method - extract expiration
+    private Date extractExpiration(String token) {
+        // Similar to extractUsername, but get expiration claim
+        return null;
+    }
+    
+    // Helper method - check if token is expired
+    private boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+}
+
+📚 Your Learning Tasks
+Task 1: Research & Implement
+Look up the JJWT library documentation:
+
+Jwts.builder() methods
+Jwts.parser() methods
+How to create a SecretKey
+
+Don't just copy-paste! Understand each method.
+Task 2: Answer These Questions
+
+What's the difference between:
+
+Symmetric vs Asymmetric key signing?
+Which one are we using (HS256)?
+
+
+JWT Structure: A JWT has 3 parts separated by dots. What are they?
+
+xxxxx.yyyyy.zzzzz
+Header, ?, ?
+
+
+Security consideration: Why must the secret key be long and random?
+
+
+🎯 After You Implement JwtService
+Once you've implemented the three methods, test your understanding:
+java// In your mind (or a test class), trace through this:
+UserDetails user = // ... load user
+String token = jwtService.generateToken(user);
+String username = jwtService.extractUsername(token);
+boolean valid = jwtService.isTokenValid(token, user);
+
+// What would happen if:
+// - Token is expired?
+// - Token is tampered with?
+// - Wrong secret key is used?
+
+⏭️ What Comes After JwtService?
+Once JWT is done, we'll create:
+
+JwtAuthenticationFilter (extends OncePerRequestFilter) - This intercepts requests
+AuthService - Registration and login business logic
+AuthController - REST endpoints
+
+But don't skip ahead! Implement JwtService properly first.
+
+✅ Your Action Items
+
+Add JWT dependencies to pom.xml
+Add JWT properties to application.properties (think about secret management!)
+Implement JwtService - all three methods + helpers
+Answer my questions about JWT structure and security
+Test locally - create a simple test to generate and validate a token
+
+Share your JwtService implementation when done. I want to see how you approached it!
+Ready to dive into JWT? This is where it gets interesting! 🚀Done all things which you said.
+JwtAuthenticationFilter comes after JwtService. Service Logic Comes after those filter.Let's move aheadJan 30Perfect! You're thinking in the right order. Let's build the JwtAuthenticationFilter - this is the heart of your JWT authentication.
+
+🔐 Understanding the Filter Chain
+Before coding, understand where your filter sits:
+HTTP Request
+    ↓
+[JwtAuthenticationFilter] ← We're building this!
+    ↓
+[Spring Security Filters]
+    ↓
+[Your Controllers]
+Your filter's job:
+
+Extract JWT from request header
+Validate the token
+Load user from database
+Set authentication in SecurityContext
+Let request continue
+
+
+🎯 JwtAuthenticationFilter Implementation
+Create security/JwtAuthenticationFilter.java:
+java@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+    private final UserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
+    ) throws ServletException, IOException {
+        
+        // TODO: Step 1 - Extract JWT from Authorization header
+        // Header format: "Bearer <token>"
+        // If no header or doesn't start with "Bearer ", skip this filter
+        
+        final String authHeader = request.getHeader("Authorization");
+        
+        // YOUR TASK: Check if authHeader is null or doesn't start with "Bearer "
+        // If so, call filterChain.doFilter(request, response) and return
+        
+        
+        // TODO: Step 2 - Extract token (remove "Bearer " prefix)
+        final String jwt = // Extract token from authHeader
+        
+        
+        // TODO: Step 3 - Extract username from token
+        final String username = // Use jwtService
+        
+        
+        // TODO: Step 4 - Check if user is not already authenticated
+        // SecurityContextHolder.getContext().getAuthentication() == null
+        
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            
+            // TODO: Step 5 - Load user from database
+            UserDetails userDetails = // Use userDetailsService
+            
+            
+            // TODO: Step 6 - Validate token
+            if (jwtService.isTokenValid(jwt, userDetails)) {
+                
+                // TODO: Step 7 - Create authentication token
+                // Use UsernamePasswordAuthenticationToken
+                // Constructor: (principal, credentials, authorities)
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    null,  // credentials (we don't need password here)
+                    userDetails.getAuthorities()
+                );
+                
+                // TODO: Step 8 - Set additional details
+                authToken.setDetails(
+                    new WebAuthenticationDetailsSource().buildDetails(request)
+                );
+                
+                // TODO: Step 9 - Set authentication in SecurityContext
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+        }
+        
+        // TODO: Step 10 - Continue filter chain
+        filterChain.doFilter(request, response);
+    }
+}
+
+🤔 Critical Questions to Answer
+Question 1: Why OncePerRequestFilter?
+What's special about OncePerRequestFilter vs regular Filter?
+Hint: Think about request forwarding and includes.
+Question 2: SecurityContext
+After you set authentication in SecurityContext, where can you access it?
+
+In your controllers?
+In other filters?
+How do you get the current authenticated user later?
+
+Question 3: What if token is invalid/expired?
+What happens in your filter if isTokenValid() returns false?
+
+Does the request get blocked?
+Does it continue to the controller?
+Think about the flow!
+
+
+🎯 Your Implementation Tasks
+Task 1: Complete the TODOs
+Fill in all the TODO sections. The logic flow is:
+
+Check header exists and has "Bearer "
+Extract token
+Extract username from token
+Check if not already authenticated
+Load user
+Validate token
+7-9. Set authentication
+Continue chain
+
+Task 2: Add Exception Handling
+What if jwtService.extractUsername() throws an exception (invalid token format)?
+Wrap the token extraction in try-catch:
+javatry {
+    // token extraction and validation
+} catch (Exception e) {
+    // Log the error
+    // Continue filter chain without setting authentication
+}
+
+🔧 SecurityConfig Updates
+Now you need to register this filter in your security chain.
+Create config/SecurityConfig.java (separate from ApplicationConfig):
+java@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final AuthenticationProvider authenticationProvider;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())  // Disable CSRF for stateless JWT
+            .authorizeHttpRequests(auth -> auth
+                // TODO: Which endpoints should be public (no auth required)?
+                // Hint: /auth/register, /auth/login
+                .requestMatchers("").permitAll()  // Fill in the paths
+                
+                // TODO: Which endpoints should require authentication?
+                .anyRequest().authenticated()
+            )
+            .sessionManagement(session -> session
+                // TODO: What session policy for JWT?
+                // Hint: STATELESS (no sessions!)
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .authenticationProvider(authenticationProvider)
+            // TODO: Add your JWT filter BEFORE UsernamePasswordAuthenticationFilter
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+}
+
+🤔 Design Questions for SecurityConfig
+Question 1: Why disable CSRF?
+CSRF protection is important, so why disable it for JWT?
+Think: What's the difference between cookie-based auth and JWT in headers?
+Question 2: Public Endpoints
+Which endpoints should be public (permitAll)?
+
+/auth/register - Yes
+/auth/login - Yes
+/api/users/me - No (needs auth)
+What about /health or /actuator/**?
+
+Question 3: Filter Order
+Why must JwtAuthenticationFilter come before UsernamePasswordAuthenticationFilter?
+Hint: Think about when authentication should be set.
+
+✅ Your Action Items
+
+Implement JwtAuthenticationFilter - complete all TODOs
+Add exception handling in the filter
+Create SecurityConfig - configure the filter chain
+Answer the questions I asked above
+Test: Try starting your application
+
+Does it start without errors?
+What happens when you hit any endpoint now?
+
+
+
+
+🧪 Quick Manual Test
+Once your app starts, try:
+bash# This should work (no auth required)
+curl http://localhost:8080/auth/register
+
+# This should return 403 Forbidden (auth required)
+curl http://localhost:8080/api/test
+
+⏭️ What's Next?
+After SecurityConfig is working:
+
+AuthService - Business logic for register/login
+AuthController - REST endpoints
+Test the full flow - Register → Login → Get Token → Access Protected Route
+
+But first, complete the filter and security config!
+Share your JwtAuthenticationFilter and SecurityConfig implementation. Show me how you thought through the filter logic!
+Ready to build the authentication pipeline? 🚀Critical Questions:
+1. It guarantees that your filter logic runs exactly once per HTTP request, even if that request is forwarded or included by the Servlet container. A standard Servlet Filter implements doFilter. In the Servlet specification, if you use a RequestDispatcher.forward() or include(), the filter chain might be executed again.
+2. You can access it in all the three.
+3. If isTokenValid returns false, the code skips setting the authentication. The SecurityContextHolder remains empty (or holds an AnonymousAuthenticationToken).  Not immediately. The filter calls filterChain.doFilter(request, response), allowing the request to continue down the chain to your Controller. Technically, yes, it tries to. However, if your controller method (or the URL itself) is protected by @PreAuthorize("isAuthenticated()") or .requestMatchers("/api/**").authenticated(), Spring Security's Authorization Filter (which comes later in the chain) will detect that the user is not authenticated.Design Questions for SecurityConfig:
+1. Stateless APIs don't need session protection.
+2. /health or /actuator/** needs to be public. 
+3. shere is code:
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+    private final UserDetailsService userDetailsService;
+
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
+
+        final String authHeader = request.getHeader("Authorization");
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        final String jwt = authHeader.substring(7);
+        final String username;
+        try {
+            username = jwtService.extractUsername(jwt);
+        } catch (Exception e) {
+            log.error("Error extracting username from JWT: {}", e.getMessage());
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (username != null && authentication == null) {
+            UserDetails userDetails;
+            try {
+                userDetails = userDetailsService.loadUserByUsername(username);
+            } catch (Exception e) {
+                log.error("User not found in database: {}", username);
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            if (jwtService.isTokenValid(jwt, userDetails)) {
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities()
+                );
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+                log.debug("Set Authentication for user '{}'", username);
+            }
+        }
+        filterChain.doFilter(request, response);
+    }
+}
+
+
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final AuthenticationProvider authenticationProvider;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+
+                .cors(cors -> cors.configure(http))
+
+              
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/api/v1/auth/**",
+                                "/v2/api-docs",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**",
+                                "/swagger-resources",
+                                "/swagger-resources/**",
+                                "/configuration/ui",
+                                "/configuration/security",
+                                "/swagger-ui/**",
+                                "/webjars/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+
+                        .anyRequest().authenticated()
+                )
+
+                
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+
+                
+                .authenticationProvider(authenticationProvider)
+
+               
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+}Yes, all the Tests are passed. and Application is running.Now let's Move to the next Level.Show moreJan 31🎉 Excellent Work!
+Your answers are spot-on, and your implementation is production-grade! I especially like:
+
+✅ Exception handling with logging
+✅ Early returns to avoid nested if statements
+✅ Swagger endpoints included in permitAll
+✅ Clean, readable code
+
+Small note on Design Question 3: You started to answer about filter order but cut off. The answer is: JwtAuthenticationFilter must come before UsernamePasswordAuthenticationFilter because we want to check for JWT tokens first, and if valid, set authentication before Spring Security's default authentication mechanisms run.
+
+🚀 Phase 2: Service Layer & Controllers
+Now let's build the business logic and expose REST endpoints!
+
+📦 Step 1: Create DTOs for Login
+You already have UserRegistrationRequestDTO and AuthResponseDTO. Now create:
+dto/LoginRequestDTO.java
+java@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class LoginRequestDTO {
+    @NotBlank(message = "Username or email is required")
+    private String usernameOrEmail;
+    
+    @NotBlank(message = "Password is required")
+    private String password;
+}
+
+🎯 Step 2: AuthService - Your Challenge
+Create service/AuthService.java. I want you to implement this based on the flow.
+Here's the skeleton:
+java@Service
+@RequiredArgsConstructor
+@Slf4j
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final AuthenticationManager authenticationManager;
+
+    /**
+     * TODO: Implement user registration
+     * 
+     * Flow:
+     * 1. Check if username already exists (throw exception if exists)
+     * 2. Check if email already exists (throw exception if exists)
+     * 3. Create new User entity:
+     *    - Set username, email, name from DTO
+     *    - Hash the password using passwordEncoder
+     *    - Set default role (Role.USER)
+     *    - Set enabled = true
+     * 4. Save user to database
+     * 5. Generate JWT token for the new user
+     * 6. Build and return AuthResponseDTO with token and user data
+     * 
+     * @param request UserRegistrationRequestDTO
+     * @return AuthResponseDTO
+     */
+    public AuthResponseDTO register(UserRegistrationRequestDTO request) {
+        // Your implementation here
+        
+        return null;
+    }
+
+    /**
+     * TODO: Implement user login
+     * 
+     * Flow:
+     * 1. Authenticate user using authenticationManager
+     *    - Create UsernamePasswordAuthenticationToken with username and password
+     *    - Call authenticationManager.authenticate()
+     *    - This will throw exception if credentials are wrong
+     * 2. Load user from database
+     * 3. Update lastLoginAt timestamp
+     * 4. Save user
+     * 5. Generate JWT token
+     * 6. Build and return AuthResponseDTO
+     * 
+     * @param request LoginRequestDTO
+     * @return AuthResponseDTO
+     */
+    public AuthResponseDTO login(LoginRequestDTO request) {
+        // Your implementation here
+        
+        return null;
+    }
+
+    /**
+     * Helper method to build AuthResponseDTO
+     */
+    private AuthResponseDTO buildAuthResponse(User user, String token) {
+        // Build UserResponseDTO from User entity
+        // Build AuthResponseDTO with token and user data
+        
+        return null;
+    }
+}
+
+🤔 Critical Design Questions
+Question 1: Exception Handling
+What exceptions should you throw if:
+
+Username already exists during registration?
+Email already exists during registration?
+Login credentials are invalid?
+
+Should you create custom exceptions or use Spring's built-in ones?
+Think about:
+
+UsernameAlreadyExistsException (custom)
+EmailAlreadyExistsException (custom)
+BadCredentialsException (Spring Security provides this)
+
+Question 2: Password Hashing
+When do you hash the password?
+java// During registration
+user.setPassword(passwordEncoder.encode(request.getPassword()));
+When do you verify the password?
+Answer: You don't manually verify! authenticationManager.authenticate() does it for you using the PasswordEncoder bean you configured.
+Question 3: UserResponseDTO Mapping
+How will you convert User entity to UserResponseDTO?
+Option A: Manual mapping
+javaUserResponseDTO userDto = UserResponseDTO.builder()
+    .id(user.getId())
+    .username(user.getUsername())
+    .email(user.getEmail())
+    .build();
+Option B: Use MapStruct (more advanced, optional for now)
+Which do you prefer for now?
+
+🎯 Your Implementation Tasks
+Task 1: Create Custom Exceptions
+Create exception/ package:
+exception/UsernameAlreadyExistsException.java
+javapublic class UsernameAlreadyExistsException extends RuntimeException {
+    public UsernameAlreadyExistsException(String message) {
+        super(message);
+    }
+}
+exception/EmailAlreadyExistsException.java
+javapublic class EmailAlreadyExistsException extends RuntimeException {
+    public EmailAlreadyExistsException(String message) {
+        super(message);
+    }
+}
+Task 2: Implement AuthService
+Complete both register() and login() methods. Follow the flow I outlined.
+Hints:
+
+For checking existence: userRepository.existsByUsername(username)
+For authentication: authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(...))
+For JWT expiration in response: use @Value("${jwt.expiration}") and divide by 1000 to get seconds
+
+Task 3: Add Repository Methods
+Update UserRepository.java:
+javapublic interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByUsername(String username);
+    Optional<User> findByEmail(String email);
+    
+    // For checking existence during registration
+    boolean existsByUsername(String username);
+    boolean existsByEmail(String email);
+    
+    // For login with username OR email
+    default Optional<User> findByUsernameOrEmail(String usernameOrEmail) {
+        return findByUsername(usernameOrEmail)
+                .or(() -> findByEmail(usernameOrEmail));
+    }
+}
+
+📝 Step 3: AuthController
+Create controller/AuthController.java:
+java@RestController
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
+@Slf4j
+public class AuthController {
+
+    private final AuthService authService;
+
+    @PostMapping("/register")
+    public ResponseEntity<AuthResponseDTO> register(
+            @Valid @RequestBody UserRegistrationRequestDTO request
+    ) {
+        log.info("Registration request for username: {}", request.getUsername());
+        AuthResponseDTO response = authService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponseDTO> login(
+            @Valid @RequestBody LoginRequestDTO request
+    ) {
+        log.info("Login request for user: {}", request.getUsernameOrEmail());
+        AuthResponseDTO response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
+}
+
+🎯 Step 4: Global Exception Handler
+Create exception/GlobalExceptionHandler.java:
+java@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(UsernameAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleUsernameAlreadyExists(UsernameAlreadyExistsException ex) {
+        log.error("Username already exists: {}", ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+            HttpStatus.CONFLICT.value(),
+            ex.getMessage(),
+            LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleEmailAlreadyExists(EmailAlreadyExistsException ex) {
+        // Similar to above
+        return null; // Implement this
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
+        // Return 401 Unauthorized
+        return null; // Implement this
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
+        // Handle @Valid validation errors
+        // Extract field errors and return meaningful message
+        return null; // Implement this
+    }
+
+    // Generic exception handler
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
+        log.error("Unexpected error: ", ex);
+        ErrorResponse error = new ErrorResponse(
+            HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            "An unexpected error occurred",
+            LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+}
+Create dto/ErrorResponse.java:
+java@Data
+@AllArgsConstructor
+public class ErrorResponse {
+    private int status;
+    private String message;
+    private LocalDateTime timestamp;
+}
+
+✅ Your Action Items
+
+Create custom exceptions (UsernameAlreadyExists, EmailAlreadyExists)
+Implement AuthService - both register and login methods
+Update UserRepository with existence checks
+Create AuthController (already provided above)
+Implement GlobalExceptionHandler - complete the TODOs
+Test manually using Postman or cURL
+
+
+🧪 Testing Checklist
+After implementation, test these scenarios:
+Registration Tests
+bash# Success case
+POST /api/v1/auth/register
+{
+  "username": "nishant",
+  "email": "nishant@example.com",
+  "password": "password123"
+}
+# Should return 201 with token
+
+# Duplicate username
+# Should return 409 Conflict
+
+# Invalid email format
+# Should return 400 Bad Request
+Login Tests
+bash# Success with username
+POST /api/v1/auth/login
+{
+  "usernameOrEmail": "nishant",
+  "password": "password123"
+}
+# Should return 200 with token
+
+# Success with email
+# Should return 200 with token
+
+# Wrong password
+# Should return 401 Unauthorized
+
+Implement these and share:
+
+Your AuthService implementation
+Your GlobalExceptionHandler implementation
+Test results from Postman/cURL
+
+This is where the magic happens! 🎯

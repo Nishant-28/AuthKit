@@ -1,5 +1,6 @@
 package com.nishant.AuthKit.dto;
 
+import com.nishant.AuthKit.entity.Role;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -11,13 +12,13 @@ class UserResponseDTOTest {
     @Test
     void shouldCreateUserResponseWithBuilder() {
         LocalDateTime now = LocalDateTime.now();
-        
+
         UserResponseDTO dto = UserResponseDTO.builder()
                 .id(1L)
                 .username("testuser")
                 .email("test@example.com")
                 .name("Test User")
-                .role("USER")
+                .role(Role.USER)
                 .profilePicUrl("http://example.com/pic.jpg")
                 .createdAt(now)
                 .updatedAt(now)
@@ -29,7 +30,7 @@ class UserResponseDTOTest {
         assertEquals("testuser", dto.getUsername());
         assertEquals("test@example.com", dto.getEmail());
         assertEquals("Test User", dto.getName());
-        assertEquals("USER", dto.getRole());
+        assertEquals(Role.USER, dto.getRole());
         assertEquals("http://example.com/pic.jpg", dto.getProfilePicUrl());
         assertEquals(now, dto.getCreatedAt());
         assertEquals(now, dto.getUpdatedAt());
