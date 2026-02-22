@@ -100,6 +100,7 @@ public class AuthService {
         }
     }
 
+    @Transactional
     public AuthResponseDTO refreshToken(RefreshTokenRequestDTO request, String ipAddress, String userAgent) {
         String currRefreshToken = request.getRefreshToken();
 
@@ -123,13 +124,15 @@ public class AuthService {
         return buildAuthResponse(user, accessToken, refreshToken);
     }
 
-    public boolean logout(String refreshToken) {
+    public void logout(String refreshToken) {
         if (refreshToken != null && !refreshToken.isBlank()) {
-            Boolean res = refreshTokenService.deleteRefreshToken(refreshToken);
-            log.info("Successfully logged out and deleted refresh token.");
-            return res;
+            boolean res = refreshTokenService.deleteRefreshToken(refreshToken);
+            if (res) {
+                log.info("Successfully logged out and deleted refresh token.");
+            } else {
+                log.warn("Logout called but refresh token was not found in Redis.");
+            }
         }
-        return false;
     }
 
 //    public void logoutAllDevices(Long userId) {}

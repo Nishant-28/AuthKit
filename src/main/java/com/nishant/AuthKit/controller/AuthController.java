@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.coyote.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -49,7 +48,7 @@ public class AuthController {
         log.info("Login request for username: {}", request.getUsernameOrEmail());
 
         AuthResponseDTO response = authService.login(request, ipAddress, userAgent);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/refresh")
@@ -64,7 +63,8 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    public ResponseEntity<Boolean> logout(
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
             @Valid @RequestBody RefreshTokenRequestDTO request
     ) {
         authService.logout(request.getRefreshToken());

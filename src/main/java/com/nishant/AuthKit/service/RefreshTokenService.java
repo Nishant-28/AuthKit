@@ -58,14 +58,14 @@ public class RefreshTokenService {
         Optional<RefreshToken> storedTokenOpt = findByToken(token);
 
         if (storedTokenOpt.isEmpty()) {
-            log.warn("Refresh token not found in Redis: {}", token);
+            log.warn("Refresh token not found in Redis: token ending: ...{})", token.substring(token.length() - 4));
             return false;
         }
 
         RefreshToken storedToken = storedTokenOpt.get();
 
         if (!storedToken.getUserId().equals(userId)) {
-            log.warn("User ID mismatch for refresh token. Expected: {}, Actual: {}", storedToken.getUserAgent(), userId);
+            log.warn("User ID mismatch for refresh token. Expected: {}, Actual: {}", storedToken.getUserId(), userId);
             return false;
         }
 
@@ -79,8 +79,8 @@ public class RefreshTokenService {
 
     public boolean deleteRefreshToken(String token) {
         String key = "refresh_token:" + token;
-        Boolean res = redisTemplate.delete(key);
-        log.info("Deleted refresh token from Redis for {}", token);
+        boolean res = redisTemplate.delete(key);
+        log.info("Deleted refresh token from Redis (token ending: ...{})", token.substring(token.length() - 4));
         return res;
     }
 
