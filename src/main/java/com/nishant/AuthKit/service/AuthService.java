@@ -1,9 +1,6 @@
 package com.nishant.AuthKit.service;
 
-import com.nishant.AuthKit.dto.AuthResponseDTO;
-import com.nishant.AuthKit.dto.LoginRequestDTO;
-import com.nishant.AuthKit.dto.UserRegistrationRequestDTO;
-import com.nishant.AuthKit.dto.UserResponseDTO;
+import com.nishant.AuthKit.dto.*;
 import com.nishant.AuthKit.entity.Role;
 import com.nishant.AuthKit.entity.User;
 import com.nishant.AuthKit.exception.EmailAlreadyExistsException;
@@ -20,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Service
@@ -31,12 +29,13 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final RefreshTokenService refreshTokenService;
 
     /**
      * Register Method for AuthService
      */
     @Transactional
-    public AuthResponseDTO register(UserRegistrationRequestDTO request) {
+    public AuthResponseDTO register(UserRegistrationRequestDTO request, String ipAddress, String userAgent) {
         log.info("Attempting to register user: {}", request.getUsername());
 
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
@@ -61,15 +60,16 @@ public class AuthService {
         User savedUser = userRepository.save(createdUser);
         log.info("User registered successfully: {}", savedUser.getUsername());
 
-        String token = jwtService.generateToken(createdUser);
-        return buildAuthResponse(savedUser, token);
+        String accessToken = jwtService.generateToken(createdUser);
+        String refreshToken = refreshTokenService.createRefreshToken(savedUser.getId(), ipAddress,userAgent);
+        return buildAuthResponse(savedUser, accessToken, refreshToken);
     }
 
     /**
      * Login Method for AuthService
      */
     @Transactional
-    public AuthResponseDTO login(LoginRequestDTO request) {
+    public AuthResponseDTO login(LoginRequestDTO request, String ipAddress, String userAgent) {
         log.info("Attempting login for: {}", request.getUsernameOrEmail());
         try {
             /**
@@ -89,22 +89,61 @@ public class AuthService {
             user.setLastLoginAt(LocalDateTime.now());
             userRepository.save(user);
 
-            String token = jwtService.generateToken(user);
+            String accessToken = jwtService.generateToken(user);
+            String refreshToken = refreshTokenService.createRefreshToken(user.getId(), ipAddress, userAgent);
 
             log.info("User logged in successfully: {}", user.getUsername());
-            return buildAuthResponse(user, token);
+            return buildAuthResponse(user, accessToken, refreshToken);
         } catch (AuthenticationException e) {
             log.error("Login failed for User: {}", request.getUsernameOrEmail());
             throw new BadCredentialsException("Invalid credentials");
         }
     }
 
+    @Transactional
+    public AuthResponseDTO refreshToken(RefreshTokenRequestDTO request, String ipAddress, String userAgent) {
+        String currRefreshToken = request.getRefreshToken();
+
+        RefreshToken storedToken = refreshTokenService.findByToken(currRefreshToken)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid Refresh Token"));
+
+        if (storedToken.getExpiresAt().isBefore(Instant.now())) {
+            refreshTokenService.deleteRefreshToken(currRefreshToken);
+            throw new IllegalArgumentException("Refresh token has expired. Please sign in again");
+        }
+
+        User user = userRepository.findById(storedToken.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("User associated with token not found"));
+
+        refreshTokenService.deleteRefreshToken(currRefreshToken);
+
+        String accessToken = jwtService.generateToken(user);
+        String refreshToken = refreshTokenService.createRefreshToken(user.getId(), ipAddress, userAgent);
+
+        log.info("Successfully rotated refresh token for user: {}", user.getUsername());
+        return buildAuthResponse(user, accessToken, refreshToken);
+    }
+
+    public void logout(String refreshToken) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            boolean res = refreshTokenService.deleteRefreshToken(refreshToken);
+            if (res) {
+                log.info("Successfully logged out and deleted refresh token.");
+            } else {
+                log.warn("Logout called but refresh token was not found in Redis.");
+            }
+        }
+    }
+
+//    public void logoutAllDevices(Long userId) {}
+
     /**
      * Helper method to build AuthResponseDTO
      */
-    private AuthResponseDTO buildAuthResponse(User user, String token) {
+    private AuthResponseDTO buildAuthResponse(User user, String accessToken, String refreshToken) {
         AuthResponseDTO auth = AuthResponseDTO.builder()
-                .accessToken(token)
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .expiresIn(jwtService.getJwtExpiration())
                 .user(mapToUserResponseDTO(user))
